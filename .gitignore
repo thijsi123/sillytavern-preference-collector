@@ -1,0 +1,6 @@
+*.jsonl
+*.log
+node_modules/
+.DS_Store
+__pycache__/
+preference-dataset/

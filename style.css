@@ -1,0 +1,118 @@
+.pc_rating_button {
+    opacity: 0.8;
+}
+
+.pc_rating_button:hover {
+    opacity: 1;
+}
+
+.pc_rating_button.pc_active_like {
+    color: #7bd88f !important;
+    opacity: 1;
+}
+
+.pc_rating_button.pc_active_dislike {
+    color: #ff7b7b !important;
+    opacity: 1;
+}
+
+.pc_settings .pc_hint {
+    font-size: 0.9em;
+    opacity: 0.85;
+    line-height: 1.4;
+    margin-bottom: 8px;
+}
+
+.pc_settings .pc_small {
+    font-size: 0.8em;
+}
+
+.pc_settings .pc_field {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 6px 0;
+}
+
+.pc_settings .pc_field input {
+    width: 5em;
+}
+
+.pc_settings .pc_section_title {
+    font-weight: bold;
+    margin-top: 10px;
+}
+
+.pc_settings .pc_stats {
+    font-size: 0.9em;
+    opacity: 0.9;
+    margin: 8px 0;
+}
+
+.pc_settings .pc_actions {
+    margin-top: 6px;
+}
+
+.pc_settings .pc_danger {
+    color: var(--red);
+}
+
+.pc_panel {
+    min-width: min(420px, 80vw);
+}
+
+.pc_settings .pc_block {
+    display: block;
+    margin: 8px 0;
+}
+
+.pc_settings .pc_block > span {
+    display: block;
+    margin-bottom: 4px;
+    font-size: 0.9em;
+    opacity: 0.9;
+}
+
+.pc_settings textarea.text_pole {
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.pc_dialog .pc_tag_list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 12px;
+    margin: 8px 0 12px;
+}
+
+.pc_dialog .pc_tag_label {
+    margin: 0;
+}
+
+.pc_dialog .pc_details {
+    margin: 8px 0;
+}
+
+.pc_dialog .pc_details summary {
+    cursor: pointer;
+    font-size: 0.9em;
+    opacity: 0.85;
+}
+
+.pc_dialog .pc_reasoning {
+    max-height: 180px;
+    overflow: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+    font-size: 0.8em;
+    opacity: 0.8;
+    margin: 6px 0;
+    padding: 6px;
+    background: var(--black30a);
+    border-radius: 4px;
+}
+
+.pc_settings .pc_field.pc_block {
+    align-items: stretch;
+    flex-direction: column;
+}

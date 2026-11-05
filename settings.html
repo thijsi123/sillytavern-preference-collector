@@ -1,0 +1,139 @@
+<div class="pc_settings">
+    <div class="inline-drawer">
+        <div class="inline-drawer-toggle inline-drawer-header">
+            <b>Preference Collector</b>
+            <div class="inline-drawer-icon fa-solid fa-circle-chevron-down down"></div>
+        </div>
+        <div class="inline-drawer-content">
+            <div class="pc_hint">
+                Rate an assistant reply with the thumbs on the message. Edit a reply first, then like it to save an
+                <b>edited</b> preference pair. Swipe to a better reply and like it to save a <b>swipe</b> pair.
+                Shift-click a thumb for failure tags + a note; Alt-click clears a rating.
+                An empty swipe can be disliked and is exported as an <b>empty</b> sample.
+            </div>
+
+            <label class="checkbox_label">
+                <input type="checkbox" id="pc_enabled">
+                <span>Enable preference collection</span>
+            </label>
+            <label class="checkbox_label">
+                <input type="checkbox" id="pc_show_buttons">
+                <span>Show thumbs on messages</span>
+            </label>
+
+            <label class="pc_field" for="pc_context_messages">
+                <span>Context messages</span>
+                <input type="number" id="pc_context_messages" class="text_pole" min="0" max="100" step="1">
+            </label>
+
+            <div class="pc_section_title">Dataset folder</div>
+            <div class="pc_hint pc_small">
+                Every rating is merged into one cumulative, model-agnostic JSONL file on the server:
+                <code>data/&lt;user&gt;/<span id="pc_dataset_file">files/preference-dataset.jsonl</span></code>
+                (that is the Data Bank folder). It is flat because the upload API rejects subdirectories.
+                Records use plain <code>role</code>/<code>content</code> messages with no chat-template tokens, so the
+                same file trains on Qwen, Gemma, DeepSeek, Llama, ... - the trainer applies that model's template.
+            </div>
+            <label class="checkbox_label">
+                <input type="checkbox" id="pc_auto_sync_dataset">
+                <span>Sync to the dataset file after every rating</span>
+            </label>
+            <label class="pc_field" for="pc_dataset_scope">
+                <span>Auto-sync scope</span>
+                <select id="pc_dataset_scope" class="text_pole">
+                    <option value="chat">Current chat</option>
+                    <option value="all">All chats</option>
+                </select>
+            </label>
+            <label class="pc_field" for="pc_dataset_filename">
+                <span>Dataset file name</span>
+                <input type="text" id="pc_dataset_filename" class="text_pole" placeholder="preference-dataset.jsonl">
+            </label>
+            <div class="pc_stats" id="pc_dataset_stats">Not synced in this session yet.</div>
+            <div class="pc_hint pc_small pc_dataset_models" style="display:none"></div>
+            <div class="pc_hint pc_small pc_dataset_tags" style="display:none"></div>
+            <div class="flex-container flexGap5 pc_actions">
+                <div id="pc_sync_current" class="menu_button" title="Merge this chat's ratings into the dataset file">
+                    Sync current chat
+                </div>
+                <div id="pc_sync_all" class="menu_button" title="Scan every chat and merge all ratings into the dataset file">
+                    Sync all chats
+                </div>
+            </div>
+            <div class="flex-container flexGap5 pc_actions">
+                <div id="pc_rebuild_dataset" class="menu_button pc_danger" title="Replace the dataset file with only what is currently in the chats">
+                    Rebuild dataset file
+                </div>
+            </div>
+
+            <div class="pc_section_title">Dataset</div>
+            <label class="checkbox_label">
+                <input type="checkbox" id="pc_include_character_card">
+                <span>Include character card in each record</span>
+            </label>
+            <label class="checkbox_label">
+                <input type="checkbox" id="pc_include_reasoning">
+                <span>Include saved reasoning</span>
+            </label>
+            <label class="checkbox_label">
+                <input type="checkbox" id="pc_include_edited_pairs">
+                <span>Create pairs from edited replies (original vs edited)</span>
+            </label>
+            <label class="checkbox_label">
+                <input type="checkbox" id="pc_include_liked_singles">
+                <span>Include liked-only samples (SFT)</span>
+            </label>
+            <label class="checkbox_label">
+                <input type="checkbox" id="pc_include_disliked_singles">
+                <span>Include disliked-only samples (KTO)</span>
+            </label>
+            <label class="checkbox_label">
+                <input type="checkbox" id="pc_include_empty_samples">
+                <span>Include empty / reasoning-only generations as rejected samples</span>
+            </label>
+
+            <div class="pc_section_title">Prompt capture</div>
+            <div class="pc_hint pc_small">
+                Captures the exact prompt a generation sent (system prompt, card, world info, author's note) and stores it
+                with the rating. This is what a training script should feed back in, instead of a reconstructed chat.
+                It makes chat files heavier, so it can be turned off.
+            </div>
+            <label class="checkbox_label">
+                <input type="checkbox" id="pc_capture_prompt">
+                <span>Capture the outgoing prompt per generation</span>
+            </label>
+            <label class="checkbox_label">
+                <input type="checkbox" id="pc_include_prompt">
+                <span>Store the captured prompt with ratings</span>
+            </label>
+
+            <div class="pc_section_title">Failure tags</div>
+            <label class="pc_field pc_block" for="pc_failure_tags">
+                <span>Comma-separated tags offered in the shift-click dialog</span>
+                <textarea id="pc_failure_tags" class="text_pole textarea_compact" rows="3"></textarea>
+            </label>
+
+            <div class="pc_stats" id="pc_stats">No ratings yet in this chat.</div>
+
+            <div class="flex-container flexGap5 pc_actions">
+                <div id="pc_export_current" class="menu_button" title="Download preference data for the current chat">
+                    Export current chat
+                </div>
+                <div id="pc_export_all" class="menu_button" title="Scan every character and group chat on the server">
+                    Export all chats
+                </div>
+            </div>
+            <div class="flex-container flexGap5 pc_actions">
+                <div id="pc_clear_current" class="menu_button pc_danger" title="Remove all preference ratings from this chat">
+                    Clear ratings in current chat
+                </div>
+            </div>
+
+            <div class="pc_hint pc_small">
+                Ratings are stored per swipe inside <code>swipe_info[i].extra.preference</code>. They survive reloads and
+                chat saves. Each exported line is a JSONL preference record with context, the captured prompt, chosen,
+                rejected, tags and per-swipe metadata.
+            </div>
+        </div>
+    </div>
+</div>
