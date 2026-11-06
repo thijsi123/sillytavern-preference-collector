@@ -21,6 +21,26 @@
                 <span>Show thumbs on messages</span>
             </label>
 
+            <label class="pc_field" for="pc_button_position">
+                <span>Thumb placement</span>
+                <select id="pc_button_position" class="text_pole">
+                    <option value="auto">Auto (bar on desktop, below message on phone)</option>
+                    <option value="inline">In the message action bar</option>
+                    <option value="top">Top, next to the character name</option>
+                    <option value="bottom">Bottom, under the message text</option>
+                    <option value="both">Both top and bottom</option>
+                </select>
+            </label>
+
+            <label class="pc_field" for="pc_floating_buttons">
+                <span>Floating bar</span>
+                <select id="pc_floating_buttons" class="text_pole">
+                    <option value="auto">Auto (only when no thumbs were placed)</option>
+                    <option value="always">Always show</option>
+                    <option value="never">Never</option>
+                </select>
+            </label>
+
             <label class="pc_field" for="pc_context_messages">
                 <span>Context messages</span>
                 <input type="number" id="pc_context_messages" class="text_pole" min="0" max="100" step="1">

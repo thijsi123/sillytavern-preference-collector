@@ -68,6 +68,7 @@ const defaultSettings = {
     autoSyncDataset: true,
     datasetScope: 'chat',
     showFloatingButtons: 'auto',
+    buttonPosition: 'auto',
     failureTags: 'ignored user action, contradicted user action, repeated card detail, no room to react, forced escalation, internal monologue dump, repetition, wrong voice, empty reply',
 };
 
@@ -655,14 +656,86 @@ async function onMessageEdited(messageId) {
     refreshMessageButtons(messageId);
 }
 
+function isTouchDevice() {
+    try {
+        if (ctx()?.isMobile?.() === true) {
+            return true;
+        }
+    } catch {
+        // ignore
+    }
+
+    try {
+        if (typeof window === 'undefined') {
+            return false;
+        }
+
+        if ('ontouchstart' in window || (window.navigator?.maxTouchPoints ?? 0) > 0) {
+            return true;
+        }
+
+        if (window.matchMedia?.('(pointer: coarse)').matches) {
+            return true;
+        }
+    } catch {
+        // ignore
+    }
+
+    return false;
+}
+
+function isNarrowViewport() {
+    try {
+        return typeof window !== 'undefined' && (window.innerWidth ?? 1200) <= 1000;
+    } catch {
+        return false;
+    }
+}
+
+/**
+ * Where the thumbs are rendered on each assistant message.
+ * - `inline`: inside the message action bar (`.mes_buttons`)
+ * - `top`:    next to the character name row
+ * - `bottom`: below the message text, full width, cannot be clipped
+ * - `both`:   top and bottom
+ * - `auto`:   `inline` on wide mouse/trackpad screens, `bottom` on touch/narrow
+ */
+function resolvedButtonPosition() {
+    const position = getSettings().buttonPosition ?? 'auto';
+
+    if (position !== 'auto') {
+        return position;
+    }
+
+    return (isTouchDevice() || isNarrowViewport()) ? 'bottom' : 'inline';
+}
+
+function hostForPosition(element, position) {
+    if (position === 'inline') {
+        return element.querySelector('.mes_buttons') ?? element;
+    }
+
+    if (position === 'top') {
+        const nameText = element.querySelector('.name_text');
+        return nameText?.parentElement ?? element.querySelector('.ch_name') ?? element;
+    }
+
+    return element.querySelector('.mes_block') ?? element;
+}
+
+function makeThumb(rating) {
+    const thumb = document.createElement('div');
+    const icon = rating === 'like' ? 'up' : 'down';
+    thumb.className = `pc_rating_button pc_${rating} fa-solid fa-thumbs-${icon}`;
+    thumb.setAttribute('role', 'button');
+    thumb.setAttribute('aria-label', rating === 'like' ? 'Like this reply' : 'Dislike this reply');
+    return thumb;
+}
+
 function injectMessageButtons(messageId) {
     const settings = getSettings();
 
     if (!settings.enabled || !settings.showButtons) {
-        return;
-    }
-
-    if (!shouldInjectMessageButtons()) {
         return;
     }
 
@@ -676,41 +749,25 @@ function injectMessageButtons(messageId) {
         return;
     }
 
-    const buttons = element.querySelector('.mes_buttons');
-    if (!buttons) {
-        return;
-    }
+    const position = resolvedButtonPosition();
+    const positions = position === 'both' ? ['top', 'bottom'] : [position];
 
-    let like = buttons.querySelector('.pc_like');
-    let dislike = buttons.querySelector('.pc_dislike');
+    // Remove stale thumbs so a position change does not leave duplicates behind.
+    element.querySelectorAll('.pc_rating_button').forEach(node => node.remove());
 
-    if (!like || !dislike) {
-        like = document.createElement('div');
-        like.className = 'mes_button pc_rating_button pc_like fa-solid fa-thumbs-up';
-        like.setAttribute('role', 'button');
-
-        dislike = document.createElement('div');
-        dislike.className = 'mes_button pc_rating_button pc_dislike fa-solid fa-thumbs-down';
-        dislike.setAttribute('role', 'button');
-
-        // Append at the very end of the action bar. `.mes_buttons` is `display: flex`
-        // with `overflow-x: hidden`, so anything inserted *before* the built-in
-        // buttons is the first thing clipped on a narrow (mobile) screen. The
-        // rightmost slot is the one that survives.
-        const editButton = buttons.querySelector('.mes_edit');
-        if (editButton) {
-            editButton.insertAdjacentElement('afterend', like);
-            like.insertAdjacentElement('afterend', dislike);
-        } else {
-            buttons.appendChild(like);
-            buttons.appendChild(dislike);
+    for (const pos of positions) {
+        const host = hostForPosition(element, pos);
+        if (!host) {
+            continue;
         }
+
+        host.append(makeThumb('like'), makeThumb('dislike'));
     }
 
-    updateMessageButtonState(messageId, like, dislike);
+    updateMessageButtonState(messageId);
 }
 
-function updateMessageButtonState(messageId, likeElement = null, dislikeElement = null) {
+function updateMessageButtonState(messageId) {
     const message = ctx().chat?.[messageId];
     if (!message) {
         return;
@@ -721,32 +778,31 @@ function updateMessageButtonState(messageId, likeElement = null, dislikeElement 
         return;
     }
 
-    const like = likeElement ?? element.querySelector('.pc_like');
-    const dislike = dislikeElement ?? element.querySelector('.pc_dislike');
-    if (!like || !dislike) {
-        return;
-    }
-
     const preference = getPreference(message, currentSwipeId(message));
     const rating = preference?.rating ?? null;
     const note = preference?.note ? ` Note: ${preference.note}` : '';
     const tags = Array.isArray(preference?.tags) && preference.tags.length > 0 ? ` Tags: ${preference.tags.join(', ')}` : '';
     const edited = preference?.edited ? ' (edited)' : '';
 
-    like.classList.toggle('pc_active_like', rating === 'like');
-    dislike.classList.toggle('pc_active_dislike', rating === 'dislike');
+    element.querySelectorAll('.pc_rating_button').forEach(node => {
+        const isLike = node.classList.contains('pc_like');
+        node.classList.toggle('pc_active_like', isLike && rating === 'like');
+        node.classList.toggle('pc_active_dislike', !isLike && rating === 'dislike');
 
-    like.title = rating === 'like'
-        ? `Liked${edited}. Shift-click to edit tags/note, Alt-click to clear.${note}${tags}`
-        : 'Like this reply (chosen). Shift-click for tags/note, Alt-click to clear.';
-    dislike.title = rating === 'dislike'
-        ? `Disliked${edited}. Shift-click to edit tags/note, Alt-click to clear.${note}${tags}`
-        : 'Dislike this reply (rejected). Shift-click for tags/note, Alt-click to clear.';
+        if (isLike) {
+            node.title = rating === 'like'
+                ? `Liked${edited}. Shift-click to edit tags/note, Alt-click to clear.${note}${tags}`
+                : 'Like this reply (chosen). Shift-click for tags/note, Alt-click to clear.';
+        } else {
+            node.title = rating === 'dislike'
+                ? `Disliked${edited}. Shift-click to edit tags/note, Alt-click to clear.${note}${tags}`
+                : 'Dislike this reply (rejected). Shift-click for tags/note, Alt-click to clear.';
+        }
+    });
 }
 
 function refreshMessageButtons(messageId) {
     injectMessageButtons(messageId);
-    updateMessageButtonState(messageId);
     updateFloatingButtonState();
 }
 
@@ -763,68 +819,20 @@ function updateFloatingButtonState() {
     floatingBar.querySelector('.pc_dislike')?.classList.toggle('pc_active_dislike', rating === 'dislike');
 }
 
-/**
- * Floating 👍/👎 bar that does not depend on SillyTavern's message DOM.
- *
- * `auto` shows it only when no thumbs could be injected into the message action
- * bar (mobile themes, hidden buttons, custom layouts); `always` pins it; `never`
- * disables it. It always rates the newest assistant message.
- */
-function isTouchDevice() {
-    try {
-        // SillyTavern's own mobile flag (UA platform: mobile/tablet).
-        if (ctx()?.isMobile?.() === true) {
-            return true;
-        }
-    } catch {
-        // ignore
-    }
-
-    try {
-        if (typeof window === 'undefined') {
-            return false;
-        }
-
-        // Classic, extremely reliable touch signals.
-        if ('ontouchstart' in window || (window.navigator?.maxTouchPoints ?? 0) > 0) {
-            return true;
-        }
-
-        if (window.matchMedia?.('(pointer: coarse)').matches) {
-            return true;
-        }
-    } catch {
-        // ignore
-    }
-
-    return false;
-}
-
-function shouldInjectMessageButtons() {
-    const mode = getSettings().showFloatingButtons ?? 'auto';
-
-    // 'auto': message thumbs on mouse/trackpad, floating bar on touch devices.
-    // 'always' / 'never': always try message thumbs (floating bar handled separately).
-    if (mode === 'auto') {
-        return !isTouchDevice();
-    }
-
-    return true;
-}
-
 function removeFloatingBar() {
     floatingBar?.remove();
     floatingBar = null;
 }
 
+/**
+ * Floating bar as a fallback when no message thumbs could be injected at all.
+ * `auto` = only in that case, `always` = pinned, `never` = off.
+ */
 function ensureFloatingBar() {
     const settings = getSettings();
     const mode = settings.showFloatingButtons ?? 'auto';
     const injected = document.querySelectorAll('#chat .mes .pc_rating_button').length;
-    const narrow = typeof window !== 'undefined' && (window.innerWidth ?? 1200) <= 1000;
-    const shouldShow = !!settings.enabled && (
-        mode === 'always' || (mode === 'auto' && (injected === 0 || isTouchDevice() || narrow))
-    );
+    const shouldShow = !!settings.enabled && (mode === 'always' || (mode === 'auto' && injected === 0));
 
     if (!shouldShow) {
         removeFloatingBar();
@@ -861,9 +869,10 @@ function diagnosticsText() {
         `version: ${getExtensionVersion()}`,
         `folder: ${EXTENSION_FOLDER}`,
         `mobile: ${typeof ctx().isMobile === 'function' ? ctx().isMobile() : 'unknown'}`,
+        `touch: ${isTouchDevice()}, narrow: ${isNarrowViewport()}`,
+        `button position: ${resolvedButtonPosition()}`,
         `chat loaded: ${chat.length} messages (${assistantMessages} assistant)`,
         `#chat .mes rendered: ${document.querySelectorAll('#chat .mes').length}`,
-        `.mes_buttons present: ${document.querySelectorAll('#chat .mes .mes_buttons').length}`,
         `thumbs injected: ${document.querySelectorAll('#chat .mes .pc_rating_button').length}`,
         `floating bar: ${floatingBar ? 'shown' : 'hidden'} (mode: ${getSettings().showFloatingButtons})`,
         `enabled: ${getSettings().enabled}, showButtons: ${getSettings().showButtons}`,
@@ -871,7 +880,7 @@ function diagnosticsText() {
     ].join(String.fromCharCode(10));
 }
 
-const VERSION = '1.1.3';
+const VERSION = '1.1.4';
 
 function getExtensionVersion() {
     return VERSION;
@@ -1842,6 +1851,8 @@ function applySettingsToUi() {
 
     $('#pc_enabled').prop('checked', settings.enabled);
     $('#pc_show_buttons').prop('checked', settings.showButtons);
+    $('#pc_button_position').val(settings.buttonPosition ?? 'auto');
+    $('#pc_floating_buttons').val(settings.showFloatingButtons ?? 'auto');
     $('#pc_context_messages').val(settings.contextMessages);
     $('#pc_include_character_card').prop('checked', settings.includeCharacterCard);
     $('#pc_include_reasoning').prop('checked', settings.includeReasoning);
@@ -1868,6 +1879,18 @@ function bindSettingsUi() {
 
     $('#pc_show_buttons').on('change', () => {
         settings.showButtons = $('#pc_show_buttons').prop('checked');
+        saveSettings();
+        refreshAllMessageButtons();
+    });
+
+    $('#pc_button_position').on('change', () => {
+        settings.buttonPosition = String($('#pc_button_position').val() ?? 'auto');
+        saveSettings();
+        refreshAllMessageButtons();
+    });
+
+    $('#pc_floating_buttons').on('change', () => {
+        settings.showFloatingButtons = String($('#pc_floating_buttons').val() ?? 'auto');
         saveSettings();
         refreshAllMessageButtons();
     });

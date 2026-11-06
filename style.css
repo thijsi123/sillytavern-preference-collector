@@ -169,3 +169,35 @@
 .pc_floating_bar {
     z-index: 99999 !important;
 }
+
+/* Thumbs rendered as a block inside the message (top / bottom placement).
+   They are not inside `.mes_buttons`, so they cannot be clipped by its
+   `overflow-x: hidden`. */
+#chat .mes .mes_block > .pc_rating_button,
+#chat .mes .name_text ~ .pc_rating_button,
+#chat .mes .mes_block .ch_name .pc_rating_button {
+    display: inline-block;
+    width: auto;
+    margin-top: 4px;
+    margin-right: 6px;
+    padding: 2px 6px;
+    font-size: 1.05em;
+    opacity: 0.55;
+}
+
+#chat .mes .mes_block > .pc_rating_button:last-of-type {
+    margin-right: 0;
+}
+
+body.pc_mobile #chat .mes .mes_block > .pc_rating_button {
+    padding: 6px 10px;
+    font-size: 1.15em;
+}
+
+@media (pointer: coarse) {
+    #chat .mes .mes_block > .pc_rating_button,
+    #chat .mes .mes_block .ch_name .pc_rating_button {
+        padding: 6px 10px;
+        font-size: 1.15em;
+    }
+}

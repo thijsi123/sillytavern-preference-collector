@@ -33,27 +33,30 @@ Works on desktop and on the mobile web UI (same SillyTavern server, same dataset
 
 Slash commands for a keyboard-only flow: `/pc-like` and `/pc-dislike` rate the last assistant reply.
 
-### On a phone
+### Thumb placement
 
-On a coarse-pointer (touch) device the extension switches to a **floating 👍/👎 bar** pinned above the input
-area instead of injecting into each message. It always rates the newest assistant reply, and it works even
-when a theme hides or clips the message action bar.
+SillyTavern's message action bar is `display: flex; flex-wrap: nowrap; overflow-x: hidden`, so anything extra
+inside it can be clipped on a narrow screen. The placement is therefore configurable per device:
+
+**Thumb placement** (`auto` by default):
+
+| Value | Where the thumbs go | Notes |
+| --- | --- | --- |
+| `auto` | in the action bar on wide/mouse screens, **under the message text** on touch or ≤1000 px | default |
+| `inline` | inside the message action bar, right of the edit pencil | desktop classic |
+| `top` | next to the character name | always visible, never clipped |
+| `bottom` | below the message text, full width | best for phones |
+| `both` | top and bottom | biggest tap targets |
+
+**Floating bar** (`auto` by default): an extra 👍/👎 pill pinned above the input that always rates the newest
+reply — `auto` only shows it when no thumbs could be placed at all, `always` pins it, `never` disables it.
 
 | Touch action | Result |
 | --- | --- |
-| Tap 👍 / 👎 on the floating bar | Rate the newest reply |
+| Tap 👍 / 👎 | Rate that swipe |
 | Long-press 👍 / 👎 (≈0.5 s) | Open the tag/note dialog |
-| Panel → **Like last reply** / **Dislike last reply** | Same, without the bar |
+| Panel → **Like last reply** / **Dislike last reply** | Rate the newest reply |
 | `/pc-like`, `/pc-dislike` | Same, from the chat input |
-
-The floating bar is controlled by **Show floating buttons** (`auto` / `always` / `never`):
-
-- `auto` (default) — message thumbs on mouse/trackpad, floating bar on touch screens.
-- `always` — message thumbs **and** the floating bar everywhere.
-- `never` — only message thumbs.
-
-On desktop, the thumbs are appended at the **right end** of the message action bar (the slot that survives
-`overflow-x: hidden` clipping on narrow windows).
 
 ## Why "per swipe" matters
 
@@ -272,6 +275,13 @@ specific chat template (`chatml`, `gemma`, `llama3`, `mistral`, `sharegpt`), `--
 - Group chats are supported for exports; ratings are saved through the group-aware save path.
 
 ## Changelog
+
+### 1.1.4
+- **Configurable thumb placement**: `auto` / `inline` / `top` / `bottom` / `both`. On phones (`auto`) the
+  thumbs render under the message text instead of inside the clipped action bar, with bigger tap targets.
+- Floating bar is now a pure fallback (`auto` = only when nothing could be placed), so it no longer replaces
+  per-message thumbs on touch devices.
+- Settings + diagnostics report the resolved placement and touch/narrow detection.
 
 ### 1.1.3
 - Wider touch detection for the floating bar: SillyTavern's own `isMobile()`, `ontouchstart`,
