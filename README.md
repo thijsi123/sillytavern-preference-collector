@@ -35,19 +35,25 @@ Slash commands for a keyboard-only flow: `/pc-like` and `/pc-dislike` rate the l
 
 ### On a phone
 
-Touch has no shift/alt modifiers, so:
+On a coarse-pointer (touch) device the extension switches to a **floating 👍/👎 bar** pinned above the input
+area instead of injecting into each message. It always rates the newest assistant reply, and it works even
+when a theme hides or clips the message action bar.
 
 | Touch action | Result |
 | --- | --- |
-| Tap 👍 / 👎 | Rate that swipe |
-| Long-press 👍 / 👎 (≈0.5 s) | Open the tag/note dialog for that swipe |
-| Panel → **Like last reply** / **Dislike last reply** | Rate the newest reply without touching the message bar |
+| Tap 👍 / 👎 on the floating bar | Rate the newest reply |
+| Long-press 👍 / 👎 (≈0.5 s) | Open the tag/note dialog |
+| Panel → **Like last reply** / **Dislike last reply** | Same, without the bar |
 | `/pc-like`, `/pc-dislike` | Same, from the chat input |
 
-The thumbs are appended at the **right end** of the message action bar. SillyTavern styles that bar as
-`display: flex; overflow-x: hidden` with `white-space: nowrap`, so on a narrow screen the *built-in* buttons
-are the ones that get clipped, not the thumbs. Some themes (document-style) hide the action bar entirely on
-older messages — use the panel buttons or slash commands there.
+The floating bar is controlled by **Show floating buttons** (`auto` / `always` / `never`):
+
+- `auto` (default) — message thumbs on mouse/trackpad, floating bar on touch screens.
+- `always` — message thumbs **and** the floating bar everywhere.
+- `never` — only message thumbs.
+
+On desktop, the thumbs are appended at the **right end** of the message action bar (the slot that survives
+`overflow-x: hidden` clipping on narrow windows).
 
 ## Why "per swipe" matters
 
@@ -266,6 +272,14 @@ specific chat template (`chatml`, `gemma`, `llama3`, `mistral`, `sharegpt`), `--
 - Group chats are supported for exports; ratings are saved through the group-aware save path.
 
 ## Changelog
+
+### 1.1.2
+- **Fixed activation**: `init` was not exported from `index.js`, so SillyTavern loaded the file but never
+  ran it (`hook "activate" references "init" which is not an exported function`). No buttons, no menu entry,
+  no settings panel on any device. This was the real "doesn't show up" bug.
+- Floating 👍/👎 bar for touch devices: in `auto` mode coarse-pointer devices get the bar instead of message
+  thumbs (theme-proof), with tap-to-rate and long-press-for-tags/note.
+- `showFloatingButtons` setting (`auto` / `always` / `never`).
 
 ### 1.1.1
 - Message thumbs are appended at the right end of the action bar instead of before the edit button; on

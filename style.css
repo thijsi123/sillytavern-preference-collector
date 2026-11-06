@@ -128,3 +128,39 @@
         padding: 4px 6px;
     }
 }
+
+/* Floating thumbs fallback (touch devices / themes that hide message buttons).
+   Pinned bottom-center above the input bar. */
+.pc_floating_bar {
+    position: fixed;
+    left: 50%;
+    bottom: 90px;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 10px;
+    z-index: 1000;
+    background: var(--black50a, rgba(0, 0, 0, 0.5));
+    padding: 8px 12px;
+    border-radius: 999px;
+    border: 1px solid var(--SmartThemeBorderColor, rgba(255, 255, 255, 0.1));
+    backdrop-filter: blur(6px);
+}
+
+.pc_float_button {
+    cursor: pointer;
+    font-size: 20px;
+    padding: 8px 14px;
+    border-radius: 999px;
+    background: var(--black50a, rgba(0, 0, 0, 0.4));
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+    touch-action: manipulation;
+}
+
+.pc_float_button.pc_active_like {
+    color: #7bd88f !important;
+}
+
+.pc_float_button.pc_active_dislike {
+    color: #ff7b7b !important;
+}

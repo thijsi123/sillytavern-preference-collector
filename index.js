@@ -45,6 +45,11 @@ let pendingPrompt = null;
 let longPressTimer = null;
 let longPressFired = false;
 
+/** @type {HTMLElement|null} */
+let floatingBar = null;
+let floatPressTimer = null;
+let floatPressFired = false;
+
 const PROMPT_MAX_AGE_MS = 5 * 60 * 1000;
 
 const defaultSettings = {
@@ -62,6 +67,7 @@ const defaultSettings = {
     datasetFileName: 'preference-dataset.jsonl',
     autoSyncDataset: true,
     datasetScope: 'chat',
+    showFloatingButtons: 'auto',
     failureTags: 'ignored user action, contradicted user action, repeated card detail, no room to react, forced escalation, internal monologue dump, repetition, wrong voice, empty reply',
 };
 
@@ -656,6 +662,10 @@ function injectMessageButtons(messageId) {
         return;
     }
 
+    if (!shouldInjectMessageButtons()) {
+        return;
+    }
+
     const message = ctx().chat?.[messageId];
     if (!message || message.is_user || message.is_system) {
         return;
@@ -737,6 +747,117 @@ function updateMessageButtonState(messageId, likeElement = null, dislikeElement 
 function refreshMessageButtons(messageId) {
     injectMessageButtons(messageId);
     updateMessageButtonState(messageId);
+    updateFloatingButtonState();
+}
+
+function updateFloatingButtonState() {
+    if (!floatingBar) {
+        return;
+    }
+
+    const lastId = lastAssistantMessageId();
+    const preference = lastId >= 0 ? getPreference(ctx().chat?.[lastId], currentSwipeId(ctx().chat[lastId])) : null;
+    const rating = preference?.rating ?? null;
+
+    floatingBar.querySelector('.pc_like')?.classList.toggle('pc_active_like', rating === 'like');
+    floatingBar.querySelector('.pc_dislike')?.classList.toggle('pc_active_dislike', rating === 'dislike');
+}
+
+/**
+ * Floating 👍/👎 bar that does not depend on SillyTavern's message DOM.
+ *
+ * `auto` shows it only when no thumbs could be injected into the message action
+ * bar (mobile themes, hidden buttons, custom layouts); `always` pins it; `never`
+ * disables it. It always rates the newest assistant message.
+ */
+function isCoarsePointer() {
+    try {
+        return typeof window !== 'undefined' && !!window.matchMedia?.('(pointer: coarse)').matches;
+    } catch {
+        return false;
+    }
+}
+
+function shouldInjectMessageButtons() {
+    const mode = getSettings().showFloatingButtons ?? 'auto';
+
+    // 'auto': message thumbs on fine pointers, floating bar on touch devices.
+    // 'always' / 'never': always try message thumbs (floating bar handled separately).
+    if (mode === 'auto') {
+        return !isCoarsePointer();
+    }
+
+    return true;
+}
+
+function removeFloatingBar() {
+    floatingBar?.remove();
+    floatingBar = null;
+}
+
+function ensureFloatingBar() {
+    const settings = getSettings();
+    const mode = settings.showFloatingButtons ?? 'auto';
+    const injected = document.querySelectorAll('#chat .mes .pc_rating_button').length;
+    const shouldShow = !!settings.enabled && (
+        mode === 'always' || (mode === 'auto' && (injected === 0 || isCoarsePointer()))
+    );
+
+    if (!shouldShow) {
+        removeFloatingBar();
+        return;
+    }
+
+    if (floatingBar && document.body.contains(floatingBar)) {
+        return;
+    }
+
+    floatingBar = document.createElement('div');
+    floatingBar.id = 'pc_floating_bar';
+    floatingBar.className = 'pc_floating_bar';
+
+    const like = document.createElement('div');
+    like.className = 'pc_float_button pc_like fa-solid fa-thumbs-up';
+    like.title = 'Like the newest reply. Long-press for tags/note.';
+    like.setAttribute('role', 'button');
+
+    const dislike = document.createElement('div');
+    dislike.className = 'pc_float_button pc_dislike fa-solid fa-thumbs-down';
+    dislike.title = 'Dislike the newest reply. Long-press for tags/note.';
+    dislike.setAttribute('role', 'button');
+
+    floatingBar.append(like, dislike);
+    document.body.append(floatingBar);
+}
+
+function diagnosticsText() {
+    const chat = ctx().chat ?? [];
+    const assistantMessages = chat.filter(message => message && !message.is_user && !message.is_system).length;
+
+    return [
+        `version: ${getExtensionVersion()}`,
+        `folder: ${EXTENSION_FOLDER}`,
+        `mobile: ${typeof ctx().isMobile === 'function' ? ctx().isMobile() : 'unknown'}`,
+        `chat loaded: ${chat.length} messages (${assistantMessages} assistant)`,
+        `#chat .mes rendered: ${document.querySelectorAll('#chat .mes').length}`,
+        `.mes_buttons present: ${document.querySelectorAll('#chat .mes .mes_buttons').length}`,
+        `thumbs injected: ${document.querySelectorAll('#chat .mes .pc_rating_button').length}`,
+        `floating bar: ${floatingBar ? 'shown' : 'hidden'} (mode: ${getSettings().showFloatingButtons})`,
+        `enabled: ${getSettings().enabled}, showButtons: ${getSettings().showButtons}`,
+        `dataset file: files/${datasetFileName()}`,
+    ].join(String.fromCharCode(10));
+}
+
+const VERSION = '1.1.2';
+
+function getExtensionVersion() {
+    return VERSION;
+}
+
+function renderDiagnostics() {
+    const text = diagnosticsText();
+    $('#pc_diag').text(text);
+    return text;
 }
 
 function refreshAllMessageButtons() {
@@ -744,6 +865,7 @@ function refreshAllMessageButtons() {
 
     if (!settings.enabled || !settings.showButtons) {
         document.querySelectorAll('.pc_rating_button').forEach(element => element.remove());
+        ensureFloatingBar();
         return;
     }
 
@@ -757,6 +879,8 @@ function refreshAllMessageButtons() {
             refreshMessageButtons(messageId);
         }
     });
+
+    ensureFloatingBar();
 }
 
 function getContextMessages(messages, messageId, meta) {
@@ -1143,6 +1267,7 @@ function updateStats() {
     const text = statsText(countStats(ctx().chat ?? []));
     $('#pc_stats').text(text);
     $('#pc_panel_stats').text(text);
+    updateFloatingButtonState();
 }
 
 function sanitizeFileName(value) {
@@ -2052,9 +2177,43 @@ function registerEvents() {
     $(document).on('touchend touchcancel touchmove scroll', () => {
         clearTimeout(longPressTimer);
     });
+    // Floating bar: rate the newest reply, independent of the message DOM.
+    $(document).on('click', '.pc_float_button', async event => {
+        event.preventDefault();
+        event.stopPropagation();
+
+        if (floatPressFired) {
+            floatPressFired = false;
+            return;
+        }
+
+        const rating = event.currentTarget.classList.contains('pc_like') ? 'like' : 'dislike';
+        await rateLastMessage(rating);
+    });
+
+    $(document).on('touchstart', '.pc_float_button', event => {
+        const target = event.currentTarget;
+        const rating = target.classList.contains('pc_like') ? 'like' : 'dislike';
+
+        floatPressFired = false;
+        clearTimeout(floatPressTimer);
+        floatPressTimer = setTimeout(async () => {
+            floatPressFired = true;
+            await rateLastMessage(rating, true);
+            setTimeout(() => {
+                floatPressFired = false;
+            }, 800);
+        }, 550);
+    });
+
+    $(document).on('touchend touchcancel touchmove scroll', () => {
+        clearTimeout(longPressTimer);
+        clearTimeout(floatPressTimer);
+    });
+
 }
 
-export function lastAssistantMessageId() {
+function lastAssistantMessageId() {
     const chat = ctx().chat ?? [];
 
     for (let messageId = chat.length - 1; messageId >= 0; messageId--) {
@@ -2114,7 +2273,7 @@ function registerSlashCommands() {
     }));
 }
 
-async function init() {
+export async function init() {
     getSettings();
     await addSettingsPanel();
     bindSettingsUi();
