@@ -273,6 +273,13 @@ specific chat template (`chatml`, `gemma`, `llama3`, `mistral`, `sharegpt`), `--
 
 ## Changelog
 
+### 1.1.3
+- Wider touch detection for the floating bar: SillyTavern's own `isMobile()`, `ontouchstart`,
+  `navigator.maxTouchPoints > 0`, and `(pointer: coarse)` — not just the media query. Fixes phones that
+  report a fine pointer (e.g. desktop-site mode) and so showed neither thumbs nor the floating bar.
+- Floating bar also appears as a fallback on narrow windows (≤1000 px) even without touch.
+- Floating bar z-index raised so it cannot sit behind the input form or mobile overlays.
+
 ### 1.1.2
 - **Fixed activation**: `init` was not exported from `index.js`, so SillyTavern loaded the file but never
   ran it (`hook "activate" references "init" which is not an exported function`). No buttons, no menu entry,

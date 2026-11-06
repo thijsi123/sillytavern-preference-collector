@@ -770,21 +770,43 @@ function updateFloatingButtonState() {
  * bar (mobile themes, hidden buttons, custom layouts); `always` pins it; `never`
  * disables it. It always rates the newest assistant message.
  */
-function isCoarsePointer() {
+function isTouchDevice() {
     try {
-        return typeof window !== 'undefined' && !!window.matchMedia?.('(pointer: coarse)').matches;
+        // SillyTavern's own mobile flag (UA platform: mobile/tablet).
+        if (ctx()?.isMobile?.() === true) {
+            return true;
+        }
     } catch {
-        return false;
+        // ignore
     }
+
+    try {
+        if (typeof window === 'undefined') {
+            return false;
+        }
+
+        // Classic, extremely reliable touch signals.
+        if ('ontouchstart' in window || (window.navigator?.maxTouchPoints ?? 0) > 0) {
+            return true;
+        }
+
+        if (window.matchMedia?.('(pointer: coarse)').matches) {
+            return true;
+        }
+    } catch {
+        // ignore
+    }
+
+    return false;
 }
 
 function shouldInjectMessageButtons() {
     const mode = getSettings().showFloatingButtons ?? 'auto';
 
-    // 'auto': message thumbs on fine pointers, floating bar on touch devices.
+    // 'auto': message thumbs on mouse/trackpad, floating bar on touch devices.
     // 'always' / 'never': always try message thumbs (floating bar handled separately).
     if (mode === 'auto') {
-        return !isCoarsePointer();
+        return !isTouchDevice();
     }
 
     return true;
@@ -799,8 +821,9 @@ function ensureFloatingBar() {
     const settings = getSettings();
     const mode = settings.showFloatingButtons ?? 'auto';
     const injected = document.querySelectorAll('#chat .mes .pc_rating_button').length;
+    const narrow = typeof window !== 'undefined' && (window.innerWidth ?? 1200) <= 1000;
     const shouldShow = !!settings.enabled && (
-        mode === 'always' || (mode === 'auto' && (injected === 0 || isCoarsePointer()))
+        mode === 'always' || (mode === 'auto' && (injected === 0 || isTouchDevice() || narrow))
     );
 
     if (!shouldShow) {
@@ -848,7 +871,7 @@ function diagnosticsText() {
     ].join(String.fromCharCode(10));
 }
 
-const VERSION = '1.1.2';
+const VERSION = '1.1.3';
 
 function getExtensionVersion() {
     return VERSION;

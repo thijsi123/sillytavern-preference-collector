@@ -164,3 +164,8 @@
 .pc_float_button.pc_active_dislike {
     color: #ff7b7b !important;
 }
+
+/* Ensure the floating bar stacks above the input form and mobile overlays. */
+.pc_floating_bar {
+    z-index: 99999 !important;
+}
