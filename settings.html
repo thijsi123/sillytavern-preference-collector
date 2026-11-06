@@ -32,6 +32,11 @@
                 </select>
             </label>
 
+            <label class="checkbox_label">
+                <input type="checkbox" id="pc_animate_thumbs">
+                <span>Animate thumbs (hover scale + click pop)</span>
+            </label>
+
             <label class="pc_field" for="pc_floating_buttons">
                 <span>Floating bar</span>
                 <select id="pc_floating_buttons" class="text_pole">
@@ -49,8 +54,9 @@
             <div class="pc_section_title">Dataset folder</div>
             <div class="pc_hint pc_small">
                 Every rating is merged into one cumulative, model-agnostic JSONL file on the server:
-                <code>data/&lt;user&gt;/<span id="pc_dataset_file">files/preference-dataset.jsonl</span></code>
-                (that is the Data Bank folder). It is flat because the upload API rejects subdirectories.
+                <code>data/&lt;user&gt;/<span id="pc_dataset_file">user/files/preference-dataset.jsonl</span></code>
+                (that is the Data Bank folder, served as <code>/user/files/…</code>). It is flat because the
+                upload API rejects subdirectories.
                 Records use plain <code>role</code>/<code>content</code> messages with no chat-template tokens, so the
                 same file trains on Qwen, Gemma, DeepSeek, Llama, ... - the trainer applies that model's template.
             </div>

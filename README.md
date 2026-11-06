@@ -114,8 +114,8 @@ There are two destinations, and they serve different purposes.
 Every rating is merged into one cumulative file on the server:
 
 ```
-data/<user>/files/preference-dataset.jsonl
-data/<user>/files/preference-dataset.manifest.json
+data/<user>/user/files/preference-dataset.jsonl
+data/<user>/user/files/preference-dataset.manifest.json
 ```
 
 That is the user's **`files` directory** — the same folder the Data Bank uses. The extension writes through
@@ -256,7 +256,7 @@ The settings panel controls:
 `tools/preference_to_training.py` (stdlib only) turns the dataset into DPO / SFT / KTO files:
 
 ```bash
-python tools/preference_to_training.py data/default-user/files/preference-dataset.jsonl --out ./dataset
+python tools/preference_to_training.py data/default-user/user/files/preference-dataset.jsonl --out ./dataset
 ```
 
 It writes `dpo.jsonl`, `sft.jsonl` and `kto.jsonl`, drops empty/`like`-only records from the DPO set,
@@ -275,6 +275,14 @@ specific chat template (`chatml`, `gemma`, `llama3`, `mistral`, `sharegpt`), `--
 - Group chats are supported for exports; ratings are saved through the group-aware save path.
 
 ## Changelog
+
+### 1.1.5
+- Hover (1.18× + glow), press (0.86×) and a one-shot pop animation when a rating is saved, on both the
+  message thumbs and the floating bar.
+- New **Animate thumbs** setting (`body.pc_no_anim`) instead of a `prefers-reduced-motion` media query, so the
+  feedback is deterministic and not silently disabled by an OS/theme setting.
+- Fixed the documented dataset path: it is `data/<user>/user/files/…` (served at `/user/files/…`), not
+  `data/<user>/files/…`.
 
 ### 1.1.4
 - **Configurable thumb placement**: `auto` / `inline` / `top` / `bottom` / `both`. On phones (`auto`) the
@@ -308,7 +316,7 @@ specific chat template (`chatml`, `gemma`, `llama3`, `mistral`, `sharegpt`), `--
 - Console warning when no thumbs could be injected.
 
 ### 1.1.0
-- Cumulative model-agnostic dataset in `data/<user>/files/`, merge by record id, auto-sync, manifest.
+- Cumulative model-agnostic dataset in `data/<user>/user/files/`, merge by record id, auto-sync, manifest.
 - Prompt capture from both chat-completion and text-completion APIs.
 - Failure tags, per-swipe reasoning, empty/reasoning-only negative samples.
 - `tools/preference_to_training.py` with messages / sharegpt / chatml / gemma / llama3 / mistral output.

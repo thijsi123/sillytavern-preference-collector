@@ -69,6 +69,7 @@ const defaultSettings = {
     datasetScope: 'chat',
     showFloatingButtons: 'auto',
     buttonPosition: 'auto',
+    animateThumbs: true,
     failureTags: 'ignored user action, contradicted user action, repeated card detail, no room to react, forced escalation, internal monologue dump, repetition, wrong voice, empty reply',
 };
 
@@ -723,10 +724,27 @@ function hostForPosition(element, position) {
     return element.querySelector('.mes_block') ?? element;
 }
 
+/**
+ * One-shot pop animation. Removing the class, forcing a reflow and re-adding it
+ * makes rapid repeated clicks animate every time.
+ * @param {HTMLElement|null} element
+ */
+function popThumb(element) {
+    if (!element) {
+        return;
+    }
+
+    element.classList.remove('pc_pop');
+    void element.offsetWidth;
+    element.classList.add('pc_pop');
+
+    setTimeout(() => element.classList.remove('pc_pop'), 420);
+}
+
 function makeThumb(rating) {
     const thumb = document.createElement('div');
     const icon = rating === 'like' ? 'up' : 'down';
-    thumb.className = `pc_rating_button pc_${rating} fa-solid fa-thumbs-${icon}`;
+    thumb.className = `mes_button pc_rating_button pc_${rating} fa-solid fa-thumbs-${icon}`;
     thumb.setAttribute('role', 'button');
     thumb.setAttribute('aria-label', rating === 'like' ? 'Like this reply' : 'Dislike this reply');
     return thumb;
@@ -876,11 +894,11 @@ function diagnosticsText() {
         `thumbs injected: ${document.querySelectorAll('#chat .mes .pc_rating_button').length}`,
         `floating bar: ${floatingBar ? 'shown' : 'hidden'} (mode: ${getSettings().showFloatingButtons})`,
         `enabled: ${getSettings().enabled}, showButtons: ${getSettings().showButtons}`,
-        `dataset file: files/${datasetFileName()}`,
+        `dataset file: data/<user>/user/files/${datasetFileName()}`,
     ].join(String.fromCharCode(10));
 }
 
-const VERSION = '1.1.4';
+const VERSION = '1.1.5';
 
 function getExtensionVersion() {
     return VERSION;
@@ -1749,7 +1767,7 @@ async function syncDataset(scope = 'chat', { replace = false, silent = false } =
         }
 
         if (!silent) {
-            notify('success', `Dataset synced: ${manifest.records} record${manifest.records === 1 ? '' : 's'} (+${merged.added}, ~${merged.replaced} updated) → files/${datasetFileName()}`);
+            notify('success', `Dataset synced: ${manifest.records} record${manifest.records === 1 ? '' : 's'} (+${merged.added}, ~${merged.replaced} updated) → data/<user>/user/files/${datasetFileName()}`);
         } else {
             console.debug(MODULE_NAME, `Dataset synced: ${manifest.records} records (+${merged.added}, ~${merged.replaced})`);
         }
@@ -1769,7 +1787,7 @@ function renderDatasetState() {
     const file = datasetFileName();
     const summary = lastDatasetState?.manifest ?? null;
 
-    $('#pc_dataset_file').text(`files/${file}`);
+    $('#pc_dataset_file').text(`user/files/${file}`);
 
     if (!summary) {
         $('#pc_dataset_stats').text('Not synced in this session yet.');
@@ -1852,6 +1870,8 @@ function applySettingsToUi() {
     $('#pc_enabled').prop('checked', settings.enabled);
     $('#pc_show_buttons').prop('checked', settings.showButtons);
     $('#pc_button_position').val(settings.buttonPosition ?? 'auto');
+    $('#pc_animate_thumbs').prop('checked', settings.animateThumbs);
+    $('body').toggleClass('pc_no_anim', !settings.animateThumbs);
     $('#pc_floating_buttons').val(settings.showFloatingButtons ?? 'auto');
     $('#pc_context_messages').val(settings.contextMessages);
     $('#pc_include_character_card').prop('checked', settings.includeCharacterCard);
@@ -1887,6 +1907,12 @@ function bindSettingsUi() {
         settings.buttonPosition = String($('#pc_button_position').val() ?? 'auto');
         saveSettings();
         refreshAllMessageButtons();
+    });
+
+    $('#pc_animate_thumbs').on('change', () => {
+        settings.animateThumbs = $('#pc_animate_thumbs').prop('checked');
+        $('body').toggleClass('pc_no_anim', !settings.animateThumbs);
+        saveSettings();
     });
 
     $('#pc_floating_buttons').on('change', () => {
@@ -2006,7 +2032,7 @@ function openPanel() {
                 <div id="pc_panel_dislike_last" class="menu_button"><i class="fa-solid fa-thumbs-down"></i> Dislike last reply</div>
             </div>
             <div class="pc_hint pc_small">
-                Dataset file: <code id="pc_panel_dataset_file">files/${datasetFileName()}</code>
+                Dataset file: <code id="pc_panel_dataset_file">data/&lt;user&gt;/user/files/${datasetFileName()}</code>
             </div>
             <div class="pc_stats" id="pc_panel_dataset_stats">Not synced in this session yet.</div>
             <div class="flex-container flexGap5 pc_actions">
@@ -2193,6 +2219,7 @@ function registerEvents() {
         }
 
         const rating = target.classList.contains('pc_like') ? 'like' : 'dislike';
+        popThumb(target);
         await rateMessage(messageId, rating, event.shiftKey, event.altKey);
     });
 
@@ -2211,6 +2238,7 @@ function registerEvents() {
         longPressTimer = setTimeout(async () => {
             longPressFired = true;
             const rating = target.classList.contains('pc_like') ? 'like' : 'dislike';
+            popThumb(target);
             await rateMessage(messageId, rating, true, false);
             // Do not swallow a tap that arrives much later (some mobile browsers
             // never emit the synthetic click after a long-press).
@@ -2234,6 +2262,7 @@ function registerEvents() {
         }
 
         const rating = event.currentTarget.classList.contains('pc_like') ? 'like' : 'dislike';
+        popThumb(event.currentTarget);
         await rateLastMessage(rating);
     });
 
@@ -2245,6 +2274,7 @@ function registerEvents() {
         clearTimeout(floatPressTimer);
         floatPressTimer = setTimeout(async () => {
             floatPressFired = true;
+            popThumb(target);
             await rateLastMessage(rating, true);
             setTimeout(() => {
                 floatPressFired = false;
