@@ -33,6 +33,22 @@ Works on desktop and on the mobile web UI (same SillyTavern server, same dataset
 
 Slash commands for a keyboard-only flow: `/pc-like` and `/pc-dislike` rate the last assistant reply.
 
+### On a phone
+
+Touch has no shift/alt modifiers, so:
+
+| Touch action | Result |
+| --- | --- |
+| Tap 👍 / 👎 | Rate that swipe |
+| Long-press 👍 / 👎 (≈0.5 s) | Open the tag/note dialog for that swipe |
+| Panel → **Like last reply** / **Dislike last reply** | Rate the newest reply without touching the message bar |
+| `/pc-like`, `/pc-dislike` | Same, from the chat input |
+
+The thumbs are appended at the **right end** of the message action bar. SillyTavern styles that bar as
+`display: flex; overflow-x: hidden` with `white-space: nowrap`, so on a narrow screen the *built-in* buttons
+are the ones that get clipped, not the thumbs. Some themes (document-style) hide the action bar entirely on
+older messages — use the panel buttons or slash commands there.
+
 ## Why "per swipe" matters
 
 `message.extra` is only the **currently selected swipe's** metadata. Every swipe has its own metadata in
@@ -248,3 +264,23 @@ specific chat template (`chatml`, `gemma`, `llama3`, `mistral`, `sharegpt`), `--
 - The chat file has an `integrity` slug in `chat_metadata`. The extension only mutates message metadata and
   then saves through SillyTavern's own save path (`saveChatConditional`), so the slug is preserved.
 - Group chats are supported for exports; ratings are saved through the group-aware save path.
+
+## Changelog
+
+### 1.1.1
+- Message thumbs are appended at the right end of the action bar instead of before the edit button; on
+  narrow/mobile screens they were the first thing clipped by `overflow-x: hidden`.
+- `.pc_rating_button` no longer shrinks; larger tap target on coarse pointers.
+- Long-press a thumb on touch devices to open the tag/note dialog (shift-click equivalent).
+- **Like last reply** / **Dislike last reply** buttons in the extensions-menu panel and the settings panel,
+  as a fallback when a theme hides message buttons.
+- Console warning when no thumbs could be injected.
+
+### 1.1.0
+- Cumulative model-agnostic dataset in `data/<user>/files/`, merge by record id, auto-sync, manifest.
+- Prompt capture from both chat-completion and text-completion APIs.
+- Failure tags, per-swipe reasoning, empty/reasoning-only negative samples.
+- `tools/preference_to_training.py` with messages / sharegpt / chatml / gemma / llama3 / mistral output.
+
+### 1.0.0
+- Initial: per-swipe thumbs, edit pairs, swipe pairs, JSONL export.

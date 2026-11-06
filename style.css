@@ -116,3 +116,15 @@
     align-items: stretch;
     flex-direction: column;
 }
+
+/* Message action bar is flex + overflow-x:hidden; never let our buttons shrink
+   or get clipped on narrow screens. */
+.pc_rating_button {
+    flex: 0 0 auto;
+}
+
+@media (pointer: coarse) {
+    .pc_rating_button {
+        padding: 4px 6px;
+    }
+}

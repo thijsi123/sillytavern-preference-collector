@@ -41,6 +41,10 @@ const promptCache = new Map();
  */
 let pendingPrompt = null;
 
+/** @type {number|null} */
+let longPressTimer = null;
+let longPressFired = false;
+
 const PROMPT_MAX_AGE_MS = 5 * 60 * 1000;
 
 const defaultSettings = {
@@ -673,14 +677,20 @@ function injectMessageButtons(messageId) {
     if (!like || !dislike) {
         like = document.createElement('div');
         like.className = 'mes_button pc_rating_button pc_like fa-solid fa-thumbs-up';
+        like.setAttribute('role', 'button');
 
         dislike = document.createElement('div');
         dislike.className = 'mes_button pc_rating_button pc_dislike fa-solid fa-thumbs-down';
+        dislike.setAttribute('role', 'button');
 
+        // Append at the very end of the action bar. `.mes_buttons` is `display: flex`
+        // with `overflow-x: hidden`, so anything inserted *before* the built-in
+        // buttons is the first thing clipped on a narrow (mobile) screen. The
+        // rightmost slot is the one that survives.
         const editButton = buttons.querySelector('.mes_edit');
         if (editButton) {
-            buttons.insertBefore(like, editButton);
-            buttons.insertBefore(dislike, editButton);
+            editButton.insertAdjacentElement('afterend', like);
+            like.insertAdjacentElement('afterend', dislike);
         } else {
             buttons.appendChild(like);
             buttons.appendChild(dislike);
@@ -1784,6 +1794,8 @@ function bindSettingsUi() {
         renderDatasetState();
     });
 
+    $('#pc_like_last').on('click', () => rateLastMessage('like'));
+    $('#pc_dislike_last').on('click', () => rateLastMessage('dislike'));
     $('#pc_sync_current').on('click', () => syncDataset('chat'));
     $('#pc_sync_all').on('click', () => syncDataset('all'));
     $('#pc_rebuild_dataset').on('click', async () => {
@@ -1816,6 +1828,13 @@ function openPanel() {
             </div>
             <div class="pc_stats" id="pc_panel_stats"></div>
             <div class="pc_hint pc_small">
+                Rate the newest reply without touching the message bar (useful on a phone).
+            </div>
+            <div class="flex-container flexGap5 pc_actions">
+                <div id="pc_panel_like_last" class="menu_button"><i class="fa-solid fa-thumbs-up"></i> Like last reply</div>
+                <div id="pc_panel_dislike_last" class="menu_button"><i class="fa-solid fa-thumbs-down"></i> Dislike last reply</div>
+            </div>
+            <div class="pc_hint pc_small">
                 Dataset file: <code id="pc_panel_dataset_file">files/${datasetFileName()}</code>
             </div>
             <div class="pc_stats" id="pc_panel_dataset_stats">Not synced in this session yet.</div>
@@ -1844,6 +1863,8 @@ function openPanel() {
     content.find('#pc_panel_export_all').on('click', () => {
         exportAllChats();
     });
+    content.find('#pc_panel_like_last').on('click', () => rateLastMessage('like'));
+    content.find('#pc_panel_dislike_last').on('click', () => rateLastMessage('dislike'));
     content.find('#pc_panel_sync').on('click', () => syncDataset('chat'));
     content.find('#pc_panel_sync_all').on('click', () => syncDataset('all'));
 
@@ -1983,6 +2004,12 @@ function registerEvents() {
         event.preventDefault();
         event.stopPropagation();
 
+        // A long-press already opened the tag/note dialog; swallow the follow-up click.
+        if (longPressFired) {
+            longPressFired = false;
+            return;
+        }
+
         const target = event.currentTarget;
         const messageElement = target.closest('.mes');
         if (!messageElement) {
@@ -1996,6 +2023,34 @@ function registerEvents() {
 
         const rating = target.classList.contains('pc_like') ? 'like' : 'dislike';
         await rateMessage(messageId, rating, event.shiftKey, event.altKey);
+    });
+
+    // Touch devices have no shift/alt modifiers, so long-press = tags/note dialog.
+    $(document).on('touchstart', '.pc_rating_button', event => {
+        const target = event.currentTarget;
+        const messageElement = target.closest('.mes');
+        const messageId = Number(messageElement?.getAttribute('mesid'));
+
+        if (!Number.isInteger(messageId)) {
+            return;
+        }
+
+        longPressFired = false;
+        clearTimeout(longPressTimer);
+        longPressTimer = setTimeout(async () => {
+            longPressFired = true;
+            const rating = target.classList.contains('pc_like') ? 'like' : 'dislike';
+            await rateMessage(messageId, rating, true, false);
+            // Do not swallow a tap that arrives much later (some mobile browsers
+            // never emit the synthetic click after a long-press).
+            setTimeout(() => {
+                longPressFired = false;
+            }, 800);
+        }, 550);
+    });
+
+    $(document).on('touchend touchcancel touchmove scroll', () => {
+        clearTimeout(longPressTimer);
     });
 }
 
@@ -2012,6 +2067,24 @@ export function lastAssistantMessageId() {
     return -1;
 }
 
+/**
+ * Rate the newest assistant reply. Also used by the panel/settings buttons and the
+ * slash commands, so rating stays possible when message buttons are hidden
+ * (mobile document-style themes, `display: none` during generation, etc.).
+ * @param {'like'|'dislike'} rating
+ * @param {boolean} withDialog
+ */
+async function rateLastMessage(rating, withDialog = false) {
+    const messageId = lastAssistantMessageId();
+
+    if (messageId < 0) {
+        notify('warning', 'There is no assistant reply to rate yet.');
+        return;
+    }
+
+    await rateMessage(messageId, rating, withDialog, false);
+}
+
 function registerSlashCommands() {
     const context = ctx();
     const SlashCommand = context.SlashCommand;
@@ -2022,13 +2095,7 @@ function registerSlashCommands() {
     }
 
     const makeCallback = rating => async () => {
-        const messageId = lastAssistantMessageId();
-        if (messageId < 0) {
-            notify('warning', 'There is no assistant reply to rate.');
-            return '';
-        }
-
-        await rateMessage(messageId, rating, false, false);
+        await rateLastMessage(rating);
         return '';
     };
 
@@ -2058,6 +2125,15 @@ async function init() {
     refreshAllMessageButtons();
     updateStats();
     renderDatasetState();
+
+    if (getSettings().enabled && getSettings().showButtons && (ctx().chat?.length ?? 0) > 0) {
+        setTimeout(() => {
+            if (document.querySelectorAll('.pc_rating_button').length === 0) {
+                console.warn(`[${MODULE_NAME}] No thumbs found in the message action bar. If this is a mobile theme with hidden message buttons, use the panel's "Like last reply" buttons, /pc-like or /pc-dislike.`);
+            }
+        }, 1500);
+    }
+
     void refreshDatasetState();
     console.log(`[${MODULE_NAME}] Ready.`);
 }
